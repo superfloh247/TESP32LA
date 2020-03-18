@@ -1,3 +1,7 @@
+/*
+ *  License: CC BY-NC-SA
+ */
+
 // installed via Arduino IDE Library manager
 #include <TaskScheduler.h>
 #include <TaskSchedulerDeclarations.h>
@@ -180,7 +184,7 @@ void setup()
     if (iotWebConf.handleCaptivePortal()) {
       return; // all set, nothing more to be done here
     }
-    String html = String("<html><head><meta http-equiv=\"refresh\" content=\"5\"></head><body>");
+    String html = String("<html><head><meta http-equiv=\"refresh\" content=\"30\"></head><body>");
     JsonObject root = doc.as<JsonObject>();
     for (JsonPair kv : root) {
       html += String(kv.key().c_str()) + ": " + kv.value().as<String>() + "<br />";
