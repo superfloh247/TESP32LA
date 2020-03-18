@@ -208,6 +208,7 @@ void setup()
   taskScheduler.addTask(iotWebConfLoopTask);
   iotWebConfLoopTask.enable();
   tft.println("Task Scheduler is started");
+  tft.println("Setting up wifi ...");
 }
 
 void loop() {
@@ -377,7 +378,7 @@ void handleRoot() {
   }
   String html = String("<html><head></head><body>");
   html += "<h1>TESP32LA</h1>";
-  html += "Got to <a href='config'>configuration page to change settings.";
+  html += "Got to <a href='config'>configuration</a> page to change settings.";
   html += String("</body></html>");
   server.send(200, "text/html", html);
 }
