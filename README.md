@@ -2,7 +2,7 @@
 
 Addon for TeslaLogger https://github.com/bassmaster187/TeslaLogger
 
-![Image]https://github.com/superfloh247/TESP32LA/blob/master/screen_online.png?raw=true
+![Image](https://github.com/superfloh247/TESP32LA/blob/master/screen_online.png?raw=true)
 
 # prerequisites
 
