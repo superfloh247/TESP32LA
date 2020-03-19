@@ -101,6 +101,10 @@ const int maincentery = DISPLAYWIDTH / 2 + 32;
 const size_t capacity = (JSON_OBJECT_SIZE(48) + 101) * 2; // some extra space to store currently 31 fields, and 101 bytes for ESP32 architecture
 DynamicJsonDocument doc(capacity);
 
+#define RGB888TORGB565(r, g, b) ((((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)))
+
+uint8_t buf888[DISPLAYHEIGHT * 3];
+
 void setup()
 {
   Serial.begin(115200);
@@ -131,12 +135,20 @@ void setup()
       return; // all set, nothing more to be done here
     }
     String html = String("<html><head><meta http-equiv=\"refresh\" content=\"30\"></head><body>");
+    html += "<img src='screen.bmp'><br />";
     JsonObject root = doc.as<JsonObject>();
     for (JsonPair kv : root) {
       html += String(kv.key().c_str()) + ": " + kv.value().as<String>() + "<br />";
     }
     html += String("</body></html>");
     server.send(200, "text/html", html);
+  });
+  server.on("/screen.bmp", []() {
+    if (iotWebConf.handleCaptivePortal()) {
+      return; // all set, nothing more to be done here
+    }
+    Serial.println("call sendBMP");
+    sendBMP(server.client());
   });
   server.on("/demo", []() {
     if (iotWebConf.handleCaptivePortal()) {
@@ -233,15 +245,11 @@ void httpClientCallback() {
   }
 }
 
-uint16_t RGB888toRGB565(uint8_t r, uint8_t g, uint8_t b) {
-  return (((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3));
-}
-
 void drawStateIcons() {
   int offset = 0;
   framebufferIcons.fillSprite(TFT_BLACK);
   if (stateOnline && !stateSleeping) { // online
-    framebufferIcons.drawXBitmap(0, 0, icon_online_bits, icon_online_width, icon_online_height + offset, RGB888toRGB565(0, nextOnlineIcon, 0), TFT_BLACK);
+    framebufferIcons.drawXBitmap(0, 0, icon_online_bits, icon_online_width, icon_online_height + offset, RGB888TORGB565(0, nextOnlineIcon, 0), TFT_BLACK);
     offset += icon_online_height;
     if (nextOnlineIcon > 250) {
       nextOnlineIconUp = false;
@@ -252,8 +260,7 @@ void drawStateIcons() {
     nextOnlineIcon += nextOnlineIconUp ? 4 : -4;
   }
   else if (!stateOnline && stateSleeping) { // asleep
-    //framebufferIcons.drawXBitmap(0, 0, icon_zzz_bits, icon_zzz_height + offset, icon_zzz_width, RGB888toRGB565(0, 0, nextZZZIcon), TFT_BLACK);
-    framebufferIcons.drawXBitmap(0, 0, icon_zzz_bits, icon_zzz_width, icon_zzz_height + offset, RGB888toRGB565(0, 0, nextZZZIcon), TFT_BLACK);
+    framebufferIcons.drawXBitmap(0, 0, icon_zzz_bits, icon_zzz_width, icon_zzz_height + offset, RGB888TORGB565(0, 0, nextZZZIcon), TFT_BLACK);
     offset += icon_zzz_height;
     if (nextZZZIcon > 250) {
       nextZZZIconUp = false;
@@ -264,7 +271,7 @@ void drawStateIcons() {
     nextZZZIcon += nextZZZIconUp ? 4 : -4;
   }
   else if (!stateOnline && !stateSleeping) { // offline
-    framebufferIcons.drawXBitmap(0, 0, icon_online_bits, icon_online_width, icon_online_height + offset, RGB888toRGB565(nextOnlineIcon, 0, 0), TFT_BLACK);
+    framebufferIcons.drawXBitmap(0, 0, icon_online_bits, icon_online_width, icon_online_height + offset, RGB888TORGB565(nextOnlineIcon, 0, 0), TFT_BLACK);
     offset += icon_online_height;
     if (nextOnlineIcon > 250) {
       nextOnlineIconUp = false;
@@ -275,7 +282,7 @@ void drawStateIcons() {
     nextOnlineIcon += nextOnlineIconUp ? 4 : -4;
   }
   if (stateCharging) {
-    framebufferIcons.drawXBitmap(0, offset, icon_battery_bits, icon_battery_width, icon_battery_height, RGB888toRGB565(nextChargingIcon, 0, 0), TFT_BLACK);
+    framebufferIcons.drawXBitmap(0, offset, icon_battery_bits, icon_battery_width, icon_battery_height, RGB888TORGB565(nextChargingIcon, 0, 0), TFT_BLACK);
     offset += icon_battery_height;
     if (nextChargingIcon > 250) {
       nextChargingIconUp = false;
@@ -404,4 +411,70 @@ void demoCallback() {
       break;
   }
   Serial.println("DEMO: SoC " + SoC + " stateOnline: " + stateOnline + " stateCharging: " + stateCharging + " stateSleeping: " + stateSleeping);
+}
+
+void sendBMP(WiFiClient wclient) {
+  Serial.println("start sendBMP");
+  // HTTP response header
+  Serial.println("send http header");
+  wclient.println("HTTP/1.1 200 OK");
+  wclient.println("Content-Type: image/bmp");
+  wclient.println("Connection: close");
+  wclient.println();
+  // HTTP response body
+  // BMP header
+  Serial.println("send http body");
+  wclient.write('B');
+  wclient.write('M');
+  const uint32_t extrabytes = DISPLAYHEIGHT % 4;
+  const uint32_t rgbsize = DISPLAYWIDTH * (3 * DISPLAYHEIGHT + extrabytes);
+  const uint32_t offset = 54;
+  const uint32_t filesize = rgbsize + offset;
+  writeUInt32LE(wclient, filesize);
+  writeUInt32LE(wclient, 0); // reserved
+  writeUInt32LE(wclient, offset);
+  writeUInt32LE(wclient, 40); // headerInfoSize
+  writeUInt32LE(wclient, DISPLAYHEIGHT); // width
+  writeUInt32LE(wclient, DISPLAYWIDTH); // height
+  writeUInt16LE(wclient, 1); // planes
+  writeUInt16LE(wclient, 24); // bits per pixel
+  writeUInt32LE(wclient, 0); // compress
+  Serial.println("rgbsize: " + String(rgbsize));
+  writeUInt32LE(wclient, rgbsize); // rgbsize
+  writeUInt32LE(wclient, 0); // hr
+  writeUInt32LE(wclient, 0); // vr
+  writeUInt32LE(wclient, 0); // colors
+  writeUInt32LE(wclient, 0); // important colors
+  Serial.println("send BMP raw pixels");
+  uint32_t sum = 0;
+  for (int line = tft.height() - 1; line >= 0; line--) {
+    uint32_t bufpos = 0;
+    for (int col = 0; col < tft.width(); col++) {
+      uint16_t color = 0;
+      if (col < DISPLAYHEIGHT - 40) {
+        color = framebufferMain.readPixel(col, line);
+      }
+      else {
+        color = framebufferIcons.readPixel(col - DISPLAYHEIGHT + 40, line);
+      }
+      buf888[bufpos] = (((color & 0x1F) * 527) + 23) >> 6; bufpos++; //b
+      buf888[bufpos] = ((((color >> 5) & 0x3F) * 259) + 33) >> 6; bufpos++; // g
+      buf888[bufpos] = ((((color >> 11) & 0x1F) * 527) + 23) >> 6; bufpos++; // r
+    }
+    wclient.write(buf888, sizeof(buf888));
+    sum += bufpos;
+  }
+  Serial.println("wrote " + String(sum) + " bytes");
+}
+
+void writeUInt32LE(WiFiClient wclient, uint32_t in) {
+  wclient.write((byte)in);
+  wclient.write((byte)(in >> 8));
+  wclient.write((byte)(in >> 16));
+  wclient.write((byte)(in >> 24));
+}
+
+void writeUInt16LE(WiFiClient wclient, uint16_t in) {
+  wclient.write((byte)in);
+  wclient.write((byte)(in >> 8));
 }
