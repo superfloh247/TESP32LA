@@ -2,6 +2,8 @@
 
 Addon for TeslaLogger https://github.com/bassmaster187/TeslaLogger
 
+![Image]https://github.com/superfloh247/TESP32LA/blob/master/screen_online.png?raw=true
+
 # prerequisites
 
 Arduino IDE (tested with 1.8.12) https://www.arduino.cc
