@@ -18,6 +18,8 @@ read the comments in TESP32LA.ino
 
 After the board is flashed, connect to Wifi TESP32LA and configure it to use your wifi and the TeslaLogger URL.
 
+When properly configured, the TESP32LA will be reachable in your Wifi at http://tesp32la.local
+
 # License
 
 CC BY-NC-SA
