@@ -393,7 +393,7 @@ void wifiConnected() {
 
 void demoCallback() {
   SoC = String(random(0, 101)); // random will be from 0 to 100
-  switch (random(0, 3)) { // random will be from 0 to 2
+  switch (random(0, 4)) { // random will be from 0 to 3
     case 0: // charging
       stateOnline = true;
       stateCharging = true;
@@ -408,6 +408,11 @@ void demoCallback() {
       stateOnline = false;
       stateCharging = false;
       stateSleeping = false;
+      break;
+    case 3: // sleeping
+      stateOnline = false;
+      stateCharging = false;
+      stateSleeping = true;
       break;
   }
   Serial.println("DEMO: SoC " + SoC + " stateOnline: " + stateOnline + " stateCharging: " + stateCharging + " stateSleeping: " + stateSleeping);
