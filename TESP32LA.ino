@@ -388,6 +388,7 @@ boolean formValidator() {
 
 void wifiConnected() {
   tft.println("Wifi connected");
+  WiFi.setHostname(iotWebConf.getThingName());
   httpClientTask.enable();
 }
 
