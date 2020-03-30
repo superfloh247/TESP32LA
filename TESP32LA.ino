@@ -202,6 +202,7 @@ void loop() {
 void httpClientCallback() {
   HTTPClient http;
   http.useHTTP10(true);
+  http.setConnectTimeout(httpClientTask.getInterval() / 2); 
   http.begin(url);
   Serial.println("[HTTP] GET...");
   int httpCode = http.GET();
