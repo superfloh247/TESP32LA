@@ -105,10 +105,18 @@ DynamicJsonDocument doc(capacity);
 
 uint8_t buf888[DISPLAYHEIGHT * 3];
 
+#define LOGBUFFER 256
+#define LOGLENGTH 255
+static char CircularLogBuffer[LOGBUFFER][LOGLENGTH+1];
+int LogBufferIndex = 0;
+
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("Start");
+  for (int i = 0; i < LOGBUFFER; i++) {
+    strcpy(CircularLogBuffer[i], "");
+  }
+  logToSerialAndBuffer("Start");
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
@@ -128,10 +136,10 @@ void setup()
   iotWebConf.getApTimeoutParameter()->visible = true;
   iotWebConf.setupUpdateServer(&httpUpdater, "/update");
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
-  Serial.println("iotWebConf.init()");
+  logToSerialAndBuffer("IotWebConf::init()");
   iotWebConf.init();
   tft.println("IotWebConf is set up");
-  Serial.println("url set to " + String(urlParamValue) + " by IotWebConf");
+  logToSerialAndBuffer("url set to " + String(urlParamValue) + " by IotWebConf");
   server.on("/status", []() {
     if (iotWebConf.handleCaptivePortal()) {
       return; // all set, nothing more to be done here
@@ -149,7 +157,7 @@ void setup()
     if (iotWebConf.handleCaptivePortal()) {
       return; // all set, nothing more to be done here
     }
-    Serial.println("call sendBMP");
+    logToSerialAndBuffer("call sendBMP");
     sendBMP(server.client());
   });
   server.on("/demo", []() {
@@ -162,6 +170,19 @@ void setup()
     server.send(200, "text/html", html);
     demoTask.enable();
     httpClientTask.disable();
+  });
+  server.on("/log", []() {
+    if (iotWebConf.handleCaptivePortal()) {
+      return; // all set, nothing more to be done here
+    }
+    String html = String("<html><head></head><body>");
+    for (int i = 0; i < LOGBUFFER; i++) {
+      if (getCircularLogBuffer(i).length() > 0) {
+        html += String(i) + ": " + getCircularLogBuffer(i) + "<br />";
+      }
+    }
+    html += String("</body></html>");
+    server.send(200, "text/html", html);
   });
   server.on("/demooff", []() {
     if (iotWebConf.handleCaptivePortal()) {
@@ -189,6 +210,23 @@ void setup()
   tft.println("Setting up wifi ...");
 }
 
+void addToCircularLogBuffer(String str) {
+  if (LogBufferIndex == LOGBUFFER) {
+    LogBufferIndex = 0;
+  }
+  strcpy(CircularLogBuffer[LogBufferIndex], (str.length() < LOGLENGTH ? str.c_str() : str.substring(0, LOGLENGTH).c_str()));
+  LogBufferIndex++;
+}
+
+String getCircularLogBuffer(int index) {
+  return String(CircularLogBuffer[(LogBufferIndex + index) % LOGBUFFER]);
+}
+
+void logToSerialAndBuffer(String str) {
+  addToCircularLogBuffer(str);
+  Serial.println(str.c_str());
+}
+
 void loop() {
   if (iotWebConf.getState() == IOTWEBCONF_STATE_ONLINE) {
     if (httpClientTask.isEnabled() == false && demoTask.isEnabled() == false) {
@@ -206,31 +244,29 @@ void httpClientCallback() {
   http.useHTTP10(true);
   http.setConnectTimeout(500); 
   http.begin(urlParamValue);
-  Serial.println("[HTTP] GET " + String(urlParamValue));
+  logToSerialAndBuffer("[HTTP] GET " + String(urlParamValue));
   int httpCode = http.GET();
-  Serial.print("[HTTP] GET... code: ");
-  Serial.println(httpCode);
+  logToSerialAndBuffer("[HTTP] GET... code: " + httpCode);
   if (httpCode == HTTP_CODE_OK) {
     String payload = http.getString();
     if (payload.length() > 3) { // remove UTF8 BOM
       if (payload[0] == char(0xEF) && payload[1] == char(0xBB) && payload[2] == char(0xBF)) {
-        Serial.println("remove BOM from JSON");
+        logToSerialAndBuffer("remove BOM from JSON");
         payload = payload.substring(3);
       }
     }
     DeserializationError error = deserializeJson(doc, payload);
     if (error) {
-      Serial.print(F("deserializeJson() failed: "));
-      Serial.println(error.c_str());
+      logToSerialAndBuffer("deserializeJson() failed: " + String(error.c_str()));
     }
     else {
       // Extract values
-      Serial.println("JSON:");
-      Serial.println("online: " + doc["online"].as<String>());
-      Serial.println("charging: " + doc["charging"].as<String>());
-      Serial.println("sleeping: " + doc["sleeping"].as<String>());
-      Serial.println("outside_temp: " + (String)doc["outside_temp"].as<float>());
-      Serial.println("battery_level: " + doc["battery_level"].as<int>());
+      logToSerialAndBuffer("JSON:");
+      logToSerialAndBuffer("online: " + doc["online"].as<String>());
+      logToSerialAndBuffer("charging: " + doc["charging"].as<String>());
+      logToSerialAndBuffer("sleeping: " + doc["sleeping"].as<String>());
+      logToSerialAndBuffer("outside_temp: " + (String)doc["outside_temp"].as<float>());
+      logToSerialAndBuffer("battery_level: " + doc["battery_level"].as<int>());
       stateOnline = doc["online"];
       stateCharging = doc["charging"];
       stateSleeping = doc["sleeping"];
@@ -239,8 +275,7 @@ void httpClientCallback() {
     }
   }
   else {
-    Serial.print("[HTTP] GET... failed, error: ");
-    Serial.println(http.errorToString(httpCode).c_str());
+    logToSerialAndBuffer("[HTTP] GET... failed, error: " + String(http.errorToString(httpCode).c_str()));
   }
   http.end();
   if (updateDisplayTask.isEnabled() == false) {
@@ -359,6 +394,7 @@ void handleRoot() {
   html += "Go to <a href='config'>configuration</a> page to change settings.<br />";
   html += "Start <a href='demo'>DEMO</a> mode.<br />";
   html += "Check <a href='status'>status</a>.<br />";
+  html += "Have a look at the <a href='log'>log</a>.<br />";
   html += String("</body></html>");
   server.send(200, "text/html", html);
 }
@@ -419,20 +455,20 @@ void demoCallback() {
       stateSleeping = true;
       break;
   }
-  Serial.println("DEMO: SoC " + SoC + " stateOnline: " + stateOnline + " stateCharging: " + stateCharging + " stateSleeping: " + stateSleeping);
+  logToSerialAndBuffer("DEMO: SoC " + SoC + " stateOnline: " + stateOnline + " stateCharging: " + stateCharging + " stateSleeping: " + stateSleeping);
 }
 
 void sendBMP(WiFiClient wclient) {
-  Serial.println("start sendBMP");
+  logToSerialAndBuffer("start sendBMP");
   // HTTP response header
-  Serial.println("send http header");
+  logToSerialAndBuffer("send http header");
   wclient.println("HTTP/1.1 200 OK");
   wclient.println("Content-Type: image/bmp");
   wclient.println("Connection: close");
   wclient.println();
   // HTTP response body
   // BMP header
-  Serial.println("send http body");
+  logToSerialAndBuffer("send http body");
   wclient.write('B');
   wclient.write('M');
   const uint32_t extrabytes = DISPLAYHEIGHT % 4;
@@ -448,13 +484,13 @@ void sendBMP(WiFiClient wclient) {
   writeUInt16LE(wclient, 1); // planes
   writeUInt16LE(wclient, 24); // bits per pixel
   writeUInt32LE(wclient, 0); // compress
-  Serial.println("rgbsize: " + String(rgbsize));
+  logToSerialAndBuffer("rgbsize: " + String(rgbsize));
   writeUInt32LE(wclient, rgbsize); // rgbsize
   writeUInt32LE(wclient, 0); // hr
   writeUInt32LE(wclient, 0); // vr
   writeUInt32LE(wclient, 0); // colors
   writeUInt32LE(wclient, 0); // important colors
-  Serial.println("send BMP raw pixels");
+  logToSerialAndBuffer("send BMP raw pixels");
   uint32_t sum = 0;
   for (int line = tft.height() - 1; line >= 0; line--) {
     uint32_t bufpos = 0;
@@ -473,7 +509,7 @@ void sendBMP(WiFiClient wclient) {
     wclient.write(buf888, sizeof(buf888));
     sum += bufpos;
   }
-  Serial.println("wrote " + String(sum) + " bytes");
+  logToSerialAndBuffer("wrote " + String(sum) + " bytes");
 }
 
 void writeUInt32LE(WiFiClient wclient, uint32_t in) {
