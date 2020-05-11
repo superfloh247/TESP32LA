@@ -204,7 +204,7 @@ void httpClientCallback() {
   http.useHTTP10(true);
   http.setConnectTimeout(500); 
   http.begin(url);
-  Serial.println("[HTTP] GET...");
+  Serial.println("[HTTP] GET " + url);
   int httpCode = http.GET();
   Serial.print("[HTTP] GET... code: ");
   Serial.println(httpCode);
