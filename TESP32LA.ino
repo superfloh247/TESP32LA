@@ -23,7 +23,7 @@
 #define IOTWEBCONF_DEBUG_TO_SERIAL
 #define IOTWEBCONF_CONFIG_USE_MDNS
 
-// version 6.x!
+// version 6.x!t
 #include <ArduinoJson.h>
 
 // get this from TFT_eSPI/examples/Smooth Fonts/FLASH_Array/Smooth_font_gradient
@@ -202,7 +202,7 @@ void loop() {
 void httpClientCallback() {
   HTTPClient http;
   http.useHTTP10(true);
-  http.setConnectTimeout(httpClientTask.getInterval() / 2); 
+  http.setConnectTimeout(500); 
   http.begin(url);
   Serial.println("[HTTP] GET...");
   int httpCode = http.GET();
