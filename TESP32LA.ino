@@ -19,7 +19,7 @@
 // disable LED blinking
 #define IOTWEBCONF_STATUS_ENABLED 0
 #define IOTWEBCONF_CONFIG_VERSION "v002"
-#define IOTWEBCONF_STRING_PARAM_LEN 513
+#define IOTWEBCONF_STRING_PARAM_LEN 512
 #define IOTWEBCONF_DEBUG_TO_SERIAL
 #define IOTWEBCONF_CONFIG_USE_MDNS
 
@@ -75,14 +75,14 @@ const char thingName[] = "TESP32LA";
 const char wifiInitialPassword[] = "TESP32LA";
 
 IotWebConf iotWebConf(thingName, &dnsServer, &server, wifiInitialPassword, IOTWEBCONF_CONFIG_VERSION);
-char stringParamValue[IOTWEBCONF_STRING_PARAM_LEN] = "http://teslalogger/admin/current_json.php";
+// http://teslalogger/admin/current_json.php
+char urlParamValue[IOTWEBCONF_STRING_PARAM_LEN+1];
 void handleRoot();
 void configSaved();
 void wifiConnected();
 boolean formValidator();
-IotWebConfParameter urlParam = IotWebConfParameter("TeslaLogger URL", "urlParam", stringParamValue, IOTWEBCONF_STRING_PARAM_LEN);
-
-String url = "http://teslalogger/admin/current_json.php";
+IotWebConfParameter urlParam = IotWebConfParameter("TeslaLogger URL", "urlParam", urlParamValue, IOTWEBCONF_STRING_PARAM_LEN);
+// http://teslalogger/admin/current_json.php
 
 String SoC = "n/a";
 String outsideTemp = "n/a";
@@ -128,8 +128,10 @@ void setup()
   iotWebConf.getApTimeoutParameter()->visible = true;
   iotWebConf.setupUpdateServer(&httpUpdater, "/update");
   iotWebConf.setWifiConnectionCallback(&wifiConnected);
+  Serial.println("iotWebConf.init()");
   iotWebConf.init();
   tft.println("IotWebConf is set up");
+  Serial.println("url set to " + String(urlParamValue) + " by IotWebConf");
   server.on("/status", []() {
     if (iotWebConf.handleCaptivePortal()) {
       return; // all set, nothing more to be done here
@@ -203,8 +205,8 @@ void httpClientCallback() {
   HTTPClient http;
   http.useHTTP10(true);
   http.setConnectTimeout(500); 
-  http.begin(url);
-  Serial.println("[HTTP] GET " + url);
+  http.begin(urlParamValue);
+  Serial.println("[HTTP] GET " + String(urlParamValue));
   int httpCode = http.GET();
   Serial.print("[HTTP] GET... code: ");
   Serial.println(httpCode);
