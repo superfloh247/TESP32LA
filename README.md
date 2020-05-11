@@ -30,6 +30,8 @@ After the board is flashed, connect to Wifi TESP32LA and configure it to use you
 
 When properly configured, the TESP32LA will be reachable in your Wifi at http://tesp32la.local
 
+Configuration uses iotWebConf, for further documentation please refert to https://github.com/prampec/IotWebConf 
+
 # License
 
 CC BY-NC-SA
